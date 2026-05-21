@@ -11,13 +11,15 @@ app.use(express.json());
 const config = {
     username: process.env.PAYHERO_API_USERNAME || 'YOUR_PAYHERO_API_USERNAME',
     password: process.env.PAYHERO_API_PASSWORD || 'YOUR_PAYHERO_API_PASSWORD',
-    merchantId: process.env.PAYHERO_MERCHANT_ID || 'YOUR_MERCHANT_ID',
+    channelId: process.env.PAYHERO_CHANNEL_ID || process.env.PAYHERO_MERCHANT_ID || 'YOUR_CHANNEL_ID',
+    provider: process.env.PAYHERO_PROVIDER || 'sasapay',
+    networkCode: process.env.PAYHERO_NETWORK_CODE || '63902',
     callbackUrl: process.env.PAYHERO_CALLBACK_URL || 'https://your-public-url/api/callback',
-    baseUrl: process.env.PAYHERO_BASE_URL || 'https://api.payhero.com',
+    baseUrl: process.env.PAYHERO_BASE_URL || 'https://backend.payhero.co.ke/api/v2',
     apiUrl: process.env.PAYHERO_API_URL || ''
 };
 
-if (config.username.startsWith('YOUR_') || config.password.startsWith('YOUR_') || config.merchantId.startsWith('YOUR_')) {
+if (config.username.startsWith('YOUR_') || config.password.startsWith('YOUR_') || config.channelId.startsWith('YOUR_')) {
     console.warn('Warning: Payhero credentials are not configured. Set environment variables before using Payhero.');
 }
 
@@ -28,25 +30,31 @@ function getCheckoutUrlFromResponse(data) {
     return data.checkoutUrl || data.paymentUrl || data.redirectUrl || data.url || data.data?.checkoutUrl || data.data?.paymentUrl;
 }
 
+function getPaymentReferenceFromResponse(data) {
+    if (!data || typeof data !== 'object') {
+        return null;
+    }
+
+    return data.CheckoutRequestID || data.checkout_request_id || data.reference || data.data?.CheckoutRequestID || data.data?.reference || null;
+}
+
 async function createPayheroPayment(amount, phone) {
+    const externalReference = `INV-${Date.now()}`;
     const basePayload = {
-        merchantId: config.merchantId,
         amount,
-        currency: 'KES',
-        callbackUrl: config.callbackUrl,
-        description: 'Payhero payment for goods',
-        metadata: {
-            source: 'Payhero QR Checkout'
-        }
+        phone_number: phone,
+        provider: config.provider,
+        external_reference: externalReference,
+        callback_url: config.callbackUrl
     };
 
-    const payloadVariants = [
-        { phoneNumber: phone },
-        { msisdn: phone },
-        { mobileNumber: phone },
-        { phone: phone },
-        { customerPhoneNumber: phone }
-    ].map(extra => ({ ...basePayload, ...extra }));
+    if (config.channelId && !config.channelId.startsWith('YOUR_')) {
+        basePayload.channel_id = Number.isNaN(Number(config.channelId)) ? config.channelId : Number(config.channelId);
+    }
+
+    if (config.provider === 'sasapay') {
+        basePayload.network_code = config.networkCode;
+    }
 
     const auth = Buffer.from(`${config.username}:${config.password}`).toString('base64');
 
@@ -88,18 +96,14 @@ async function createPayheroPayment(amount, phone) {
     }
 
     async function tryUrl(url) {
-        let lastError = null;
-        for (const payload of payloadVariants) {
-            const result = await tryPost(url, payload);
-            if (result.success) {
-                return result.data;
-            }
-            if (result.notFound) {
-                return null;
-            }
-            lastError = result.error;
+        const result = await tryPost(url, basePayload);
+        if (result.success) {
+            return result.data;
         }
-        throw lastError;
+        if (result.notFound) {
+            return null;
+        }
+        throw result.error;
     }
 
     let lastError = null;
@@ -187,16 +191,15 @@ app.post('/api/payhero', async (req, res) => {
     try {
         const data = await createPayheroPayment(amount, phone);
         const checkoutUrl = getCheckoutUrlFromResponse(data);
-
-        if (!checkoutUrl) {
-            console.error('Payhero response did not include a checkout URL:', data);
-            return res.status(500).json({ success: false, message: 'Payment created but checkout URL was not returned' });
-        }
+        const paymentReference = getPaymentReferenceFromResponse(data);
 
         res.json({
             success: true,
-            message: 'Payhero payment created successfully',
+            message: checkoutUrl ? 'Payhero checkout created successfully' : 'Payhero STK push created successfully. Check your phone to complete payment.',
             checkoutUrl,
+            paymentReference,
+            status: data?.status,
+            manualInstructions: data?.manual_instructions,
             paymentData: data
         });
     } catch (error) {

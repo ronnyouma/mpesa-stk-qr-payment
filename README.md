@@ -34,21 +34,25 @@ Set these environment variables before starting the app:
 
 - `PAYHERO_API_USERNAME`
 - `PAYHERO_API_PASSWORD`
-- `PAYHERO_MERCHANT_ID`
+- `PAYHERO_CHANNEL_ID`
+- `PAYHERO_PROVIDER` (optional, defaults to `sasapay`)
+- `PAYHERO_NETWORK_CODE` (optional, defaults to `63902` for M-Pesa when using `sasapay`)
 - `PAYHERO_CALLBACK_URL`
 - `PAYHERO_BASE_URL` (e.g. `https://backend.payhero.co.ke/api/v2`)
 - `PAYHERO_API_URL` (optional; set this when the full payment endpoint path is known, such as `https://backend.payhero.co.ke/api/v2/payments`)
 
 If `PAYHERO_API_URL` is not provided, the app will try a set of common Payhero payment paths under `PAYHERO_BASE_URL`.
 
-If Payhero responds with HTTP 400, the app now logs the response body and tries common phone field names (`phoneNumber`, `msisdn`, `mobileNumber`, `phone`, `customerPhoneNumber`).
+Payhero STK Push responses usually include fields such as `success`, `status`, `reference`, and `CheckoutRequestID`. They do not always include a checkout URL, so the app treats a queued STK Push response as successful and asks the customer to check their phone.
 
 Example in PowerShell:
 
 ```powershell
 $env:PAYHERO_API_USERNAME = 'YOUR_PAYHERO_API_USERNAME'
 $env:PAYHERO_API_PASSWORD = 'YOUR_PAYHERO_API_PASSWORD'
-$env:PAYHERO_MERCHANT_ID = 'your-merchant-id'
+$env:PAYHERO_CHANNEL_ID = 'your-channel-id'
+$env:PAYHERO_PROVIDER = 'sasapay'
+$env:PAYHERO_NETWORK_CODE = '63902'
 $env:PAYHERO_CALLBACK_URL = 'https://your-ngrok-url.ngrok.io/api/callback'
 $env:PAYHERO_BASE_URL = 'https://backend.payhero.co.ke/api/v2'
 # Optional full endpoint override if needed:
@@ -114,7 +118,9 @@ npm start
 
 - `PAYHERO_API_USERNAME`
 - `PAYHERO_API_PASSWORD`
-- `PAYHERO_MERCHANT_ID`
+- `PAYHERO_CHANNEL_ID`
+- `PAYHERO_PROVIDER`
+- `PAYHERO_NETWORK_CODE`
 - `PAYHERO_CALLBACK_URL`
 - `PAYHERO_BASE_URL`
 - `PAYHERO_API_URL` (optional; only if you need to override the full payment endpoint path)

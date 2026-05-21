@@ -59,7 +59,7 @@
 <body>
     <div class="payment-card">
         <h2>💳 Pay with Payhero</h2>
-        <p style="text-align: center; color: #333;">Enter your amount and phone number, then continue to Payhero checkout.</p>
+        <p style="text-align: center; color: #333;">Enter your amount and phone number, then confirm the STK push on your phone.</p>
 
         <label>Enter Amount (KES):</label>
         <input type="number" id="amount" placeholder="e.g., 500" min="1">
@@ -115,12 +115,14 @@
                 }
 
                 if (response.ok && data.checkoutUrl) {
-                    showStatus('Redirecting to Payhero checkout...', 'success');
+                    showStatus('Redirecting to Payhero checkout...', 'success', false);
                     window.location.href = data.checkoutUrl;
                 } else if (response.ok) {
-                    showStatus('Payment request created. Please follow the checkout link.', 'success');
+                    const reference = data.paymentReference ? `<br><small>Reference: ${escapeHtml(data.paymentReference)}</small>` : '';
+                    const instructions = data.manualInstructions ? `<br><small>${escapeHtml(data.manualInstructions)}</small>` : '';
+                    showStatus(`${escapeHtml(data.message || 'Payment request sent. Check your phone to complete payment.')}${reference}${instructions}`, 'success', false);
                 } else {
-                    showStatus('Failed: ' + (data.message || response.statusText), 'error');
+                    showStatus('Failed: ' + escapeHtml(data.message || response.statusText), 'error');
                 }
             } catch (error) {
                 console.error('Fetch error:', error);
@@ -128,14 +130,23 @@
             }
         }
 
-        function showStatus(message, type) {
+        function showStatus(message, type, autoHide = true) {
             const statusDiv = document.getElementById('status');
             statusDiv.style.display = 'block';
             statusDiv.innerHTML = message;
             statusDiv.className = type;
             setTimeout(() => {
-                if (type === 'success') statusDiv.style.display = 'none';
+                if (autoHide && type === 'success') statusDiv.style.display = 'none';
             }, 10000);
+        }
+
+        function escapeHtml(value) {
+            return String(value)
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#039;');
         }
     </script>
 </body>
