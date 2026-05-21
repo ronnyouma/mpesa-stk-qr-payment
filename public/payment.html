@@ -122,7 +122,8 @@
                     const instructions = data.manualInstructions ? `<br><small>${escapeHtml(data.manualInstructions)}</small>` : '';
                     showStatus(`${escapeHtml(data.message || 'Payment request sent. Check your phone to complete payment.')}${reference}${instructions}`, 'success', false);
                 } else {
-                    showStatus('Failed: ' + escapeHtml(data.message || response.statusText), 'error');
+                    const details = formatErrorDetails(data.details);
+                    showStatus(`Failed: ${escapeHtml(data.message || response.statusText)}${details}`, 'error');
                 }
             } catch (error) {
                 console.error('Fetch error:', error);
@@ -161,6 +162,15 @@
             }
 
             return '';
+        }
+
+        function formatErrorDetails(details) {
+            if (!details) {
+                return '';
+            }
+
+            const text = typeof details === 'string' ? details : JSON.stringify(details);
+            return `<br><small>${escapeHtml(text)}</small>`;
         }
     </script>
 </body>

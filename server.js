@@ -38,6 +38,44 @@ function getPaymentReferenceFromResponse(data) {
     return data.CheckoutRequestID || data.checkout_request_id || data.reference || data.data?.CheckoutRequestID || data.data?.reference || null;
 }
 
+function getPayheroErrorMessage(error) {
+    const responseData = error.responseData;
+
+    if (!responseData) {
+        return error.message || 'Payment initiation failed';
+    }
+
+    if (typeof responseData === 'string') {
+        return responseData;
+    }
+
+    const candidates = [
+        responseData.message,
+        responseData.error,
+        responseData.detail,
+        responseData.errors,
+        responseData.data?.message,
+        responseData.data?.error,
+        responseData.data?.errors
+    ].filter(Boolean);
+
+    if (candidates.length === 0) {
+        return JSON.stringify(responseData);
+    }
+
+    return candidates.map(value => {
+        if (typeof value === 'string') {
+            return value;
+        }
+
+        if (Array.isArray(value)) {
+            return value.map(item => typeof item === 'string' ? item : JSON.stringify(item)).join('; ');
+        }
+
+        return JSON.stringify(value);
+    }).join('; ');
+}
+
 function normalizePhoneForPayhero(phone) {
     const digits = String(phone || '').replace(/\D/g, '');
 
@@ -225,17 +263,27 @@ app.post('/api/payhero', async (req, res) => {
             paymentData: data
         });
     } catch (error) {
+        const message = getPayheroErrorMessage(error);
+
         console.error('Payhero payment error:', {
-            message: error.message,
+            message,
             status: error.status,
             responseData: error.responseData,
-            url: error.url
+            url: error.url,
+            payload: error.payload ? {
+                amount: error.payload.amount,
+                phone_number: error.payload.phone_number,
+                channel_id: error.payload.channel_id,
+                provider: error.payload.provider,
+                callback_url: error.payload.callback_url,
+                has_network_code: Object.hasOwn(error.payload, 'network_code')
+            } : undefined
         });
 
         const status = Number.isInteger(error.status) ? error.status : 500;
         res.status(status).json({
             success: false,
-            message: error.responseData?.message || error.message || 'Payment initiation failed',
+            message,
             details: error.responseData || { url: error.url }
         });
     }
