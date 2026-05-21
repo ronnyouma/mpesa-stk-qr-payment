@@ -13,7 +13,8 @@ const config = {
     password: process.env.PAYHERO_API_PASSWORD || 'YOUR_PAYHERO_API_PASSWORD',
     merchantId: process.env.PAYHERO_MERCHANT_ID || 'YOUR_MERCHANT_ID',
     callbackUrl: process.env.PAYHERO_CALLBACK_URL || 'https://your-public-url/api/callback',
-    baseUrl: process.env.PAYHERO_BASE_URL || 'https://api.payhero.com'
+    baseUrl: process.env.PAYHERO_BASE_URL || 'https://api.payhero.com',
+    apiUrl: process.env.PAYHERO_API_URL || ''
 };
 
 if (config.username.startsWith('YOUR_') || config.password.startsWith('YOUR_') || config.merchantId.startsWith('YOUR_')) {
@@ -44,8 +45,49 @@ async function createPayheroPayment(amount, phone) {
         'Content-Type': 'application/json'
     };
 
-    const response = await axios.post(`${config.baseUrl}/v1/payments`, payload, { headers });
-    return response.data;
+    async function tryPost(url) {
+        try {
+            console.log('Trying Payhero URL:', url);
+            const response = await axios.post(url, payload, { headers });
+            return response.data;
+        } catch (error) {
+            if (error.response?.status === 404) {
+                console.warn('Payhero URL not found:', url);
+                return null;
+            }
+            throw error;
+        }
+    }
+
+    if (config.apiUrl) {
+        const apiUrl = config.apiUrl.replace(/\/+$/, '');
+        const data = await tryPost(apiUrl);
+        if (data) return data;
+        throw new Error(`Payhero API URL returned 404: ${apiUrl}`);
+    }
+
+    const candidatePaths = [
+        '/payments',
+        '/payment',
+        '/payment/create',
+        '/payment/init',
+        '/checkout',
+        '/charge',
+        '/transaction',
+        '/transactions',
+        '/invoices',
+        '/v2/payments',
+        '/v1/payments'
+    ];
+
+    const base = config.baseUrl.replace(/\/+$/, '');
+    for (const path of candidatePaths) {
+        const apiUrl = base + path;
+        const data = await tryPost(apiUrl);
+        if (data) return data;
+    }
+
+    throw new Error(`Unable to find a valid Payhero endpoint. Tried ${candidatePaths.length} candidate paths based on base URL ${base}`);
 }
 
 app.get('/', (req, res) => {

@@ -36,7 +36,10 @@ Set these environment variables before starting the app:
 - `PAYHERO_API_PASSWORD`
 - `PAYHERO_MERCHANT_ID`
 - `PAYHERO_CALLBACK_URL`
-- `PAYHERO_BASE_URL` (optional; defaults to `https://api.payhero.com`)
+- `PAYHERO_BASE_URL` (e.g. `https://backend.payhero.co.ke/api/v2`)
+- `PAYHERO_API_URL` (optional; set this when the full payment endpoint path is known, such as `https://backend.payhero.co.ke/api/v2/payments`)
+
+If `PAYHERO_API_URL` is not provided, the app will try a set of common Payhero payment paths under `PAYHERO_BASE_URL`.
 
 Example in PowerShell:
 
@@ -45,7 +48,9 @@ $env:PAYHERO_API_USERNAME = 'YOUR_PAYHERO_API_USERNAME'
 $env:PAYHERO_API_PASSWORD = 'YOUR_PAYHERO_API_PASSWORD'
 $env:PAYHERO_MERCHANT_ID = 'your-merchant-id'
 $env:PAYHERO_CALLBACK_URL = 'https://your-ngrok-url.ngrok.io/api/callback'
-$env:PAYHERO_BASE_URL = 'https://api.payhero.com'
+$env:PAYHERO_BASE_URL = 'https://backend.payhero.co.ke/api/v2'
+# Optional full endpoint override if needed:
+$env:PAYHERO_API_URL = 'https://backend.payhero.co.ke/api/v2/payments'
 start-local.cmd
 ```
 
@@ -110,6 +115,7 @@ npm start
 - `PAYHERO_MERCHANT_ID`
 - `PAYHERO_CALLBACK_URL`
 - `PAYHERO_BASE_URL`
+- `PAYHERO_API_URL` (optional; only if you need to override the full payment endpoint path)
 
 6. Deploy the service.
 
