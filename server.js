@@ -1,42 +1,51 @@
 const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
-const crypto = require('crypto');
 const QRCode = require('qrcode');
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-// Your Daraja credentials (get from Safaricom Developer Portal)
-// Prefer using environment variables for local development instead of hard-coded secrets.
+// Payhero configuration. Set these values in your environment.
 const config = {
-    consumerKey: process.env.DARAJA_CONSUMER_KEY || 'YOUR_CONSUMER_KEY',
-    consumerSecret: process.env.DARAJA_CONSUMER_SECRET || 'YOUR_CONSUMER_SECRET',
-    passkey: process.env.DARAJA_PASSKEY || 'YOUR_PASSKEY',
-    tillNumber: process.env.DARAJA_TILL_NUMBER || '123456', // Your Till number
-    shortCode: process.env.DARAJA_SHORTCODE || process.env.DARAJA_TILL_NUMBER || '123456',
-    callbackUrl: process.env.DARAJA_CALLBACK_URL || 'https://your-public-url/api/callback' // Must be HTTPS
+    username: process.env.PAYHERO_API_USERNAME || 'YOUR_PAYHERO_API_USERNAME',
+    password: process.env.PAYHERO_API_PASSWORD || 'YOUR_PAYHERO_API_PASSWORD',
+    merchantId: process.env.PAYHERO_MERCHANT_ID || 'YOUR_MERCHANT_ID',
+    callbackUrl: process.env.PAYHERO_CALLBACK_URL || 'https://your-public-url/api/callback',
+    baseUrl: process.env.PAYHERO_BASE_URL || 'https://api.payhero.com'
 };
 
-if (config.consumerKey.startsWith('YOUR_') || config.consumerSecret.startsWith('YOUR_') || config.passkey.startsWith('YOUR_')) {
-    console.warn('Warning: Safaricom Daraja credentials are not configured. Set environment variables before using STK Push.');
+if (config.username.startsWith('YOUR_') || config.password.startsWith('YOUR_') || config.merchantId.startsWith('YOUR_')) {
+    console.warn('Warning: Payhero credentials are not configured. Set environment variables before using Payhero.');
 }
 
-// Get OAuth token from Safaricom
-async function getAccessToken() {
-    const auth = Buffer.from(`${config.consumerKey}:${config.consumerSecret}`).toString('base64');
-    
-    try {
-        const response = await axios.get(
-            'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials',
-            { headers: { Authorization: `Basic ${auth}` } }
-        );
-        return response.data.access_token;
-    } catch (error) {
-        console.error('Token error:', error.response?.data || error.message);
-        throw error;
-    }
+function getCheckoutUrlFromResponse(data) {
+    return data.checkoutUrl || data.paymentUrl || data.redirectUrl || data.url || data.data?.checkoutUrl || data.data?.paymentUrl;
+}
+
+async function createPayheroPayment(amount, phone) {
+    const payload = {
+        merchantId: config.merchantId,
+        amount,
+        currency: 'KES',
+        phoneNumber: phone,
+        callbackUrl: config.callbackUrl,
+        description: 'Payhero payment for goods',
+        metadata: {
+            source: 'Payhero QR Checkout'
+        }
+    };
+
+    const auth = Buffer.from(`${config.username}:${config.password}`).toString('base64');
+
+    const headers = {
+        Authorization: `Basic ${auth}`,
+        'Content-Type': 'application/json'
+    };
+
+    const response = await axios.post(`${config.baseUrl}/v1/payments`, payload, { headers });
+    return response.data;
 }
 
 app.get('/', (req, res) => {
@@ -76,100 +85,55 @@ app.get('/qrcode', async (req, res) => {
     }
 });
 
-// STK Push endpoint
-app.post('/api/stkpush', async (req, res) => {
+app.post('/api/payhero', async (req, res) => {
     const { amount, phone } = req.body;
-    
+
     if (!amount || !phone) {
         return res.status(400).json({ success: false, message: 'Missing amount or phone' });
     }
-    
+
     try {
-        const token = await getAccessToken();
-        
-        // Generate password (required by Safaricom)
-        const timestamp = new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14);
-        const password = Buffer.from(
-            `${config.shortCode}${config.passkey}${timestamp}`
-        ).toString('base64');
-        
-        // Prepare STK Push request
-        const stkRequest = {
-            BusinessShortCode: config.shortCode,
-            Password: password,
-            Timestamp: timestamp,
-            TransactionType: 'CustomerBuyGoodsOnline', // For Till numbers
-            Amount: amount,
-            PartyA: phone, // Customer's phone
-            PartyB: config.tillNumber, // Your Till
-            PhoneNumber: phone,
-            CallBackURL: config.callbackUrl,
-            AccountReference: `PAY${Date.now()}`,
-            TransactionDesc: 'Payment for goods'
-        };
-        
-        const response = await axios.post(
-            'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest',
-            stkRequest,
-            { headers: { Authorization: `Bearer ${token}` } }
-        );
-        
-        console.log('STK Push response:', response.data);
-        
-        if (response.data.ResponseCode === '0') {
-            res.json({ 
-                success: true, 
-                message: 'STK Push sent successfully',
-                checkoutRequestID: response.data.CheckoutRequestID
-            });
-        } else {
-            res.json({ success: false, message: response.data.ResponseDescription });
+        const data = await createPayheroPayment(amount, phone);
+        const checkoutUrl = getCheckoutUrlFromResponse(data);
+
+        if (!checkoutUrl) {
+            console.error('Payhero response did not include a checkout URL:', data);
+            return res.status(500).json({ success: false, message: 'Payment created but checkout URL was not returned' });
         }
-        
+
+        res.json({
+            success: true,
+            message: 'Payhero payment created successfully',
+            checkoutUrl,
+            paymentData: data
+        });
     } catch (error) {
-        console.error('STK Push error:', error.response?.data || error.message);
-        res.status(500).json({ 
-            success: false, 
-            message: error.response?.data?.errorMessage || 'Payment initiation failed' 
+        console.error('Payhero payment error:', error.response?.data || error.message);
+        res.status(500).json({
+            success: false,
+            message: error.response?.data?.message || error.message || 'Payment initiation failed'
         });
     }
 });
 
 app.use(express.static('public')); // Place payment.html in 'public' folder
 
-// Callback endpoint (Safaricom will send payment confirmation here)
 app.post('/api/callback', (req, res) => {
-    console.log('Callback received:', JSON.stringify(req.body, null, 2));
-    
-    // Process the callback data
-    const { Body } = req.body;
-    if (Body && Body.stkCallback) {
-        const { ResultCode, ResultDesc, CallbackMetadata } = Body.stkCallback;
-        
-        if (ResultCode === 0) {
-            // Payment successful
-            const metadata = {};
-            CallbackMetadata.Item.forEach(item => {
-                metadata[item.Name] = item.Value;
-            });
-            
-            console.log('Payment successful!', {
-                amount: metadata.Amount,
-                phone: metadata.PhoneNumber,
-                receipt: metadata.MpesaReceiptNumber
-            });
-            
-            // TODO: Update your database, send confirmation email, etc.
-        } else {
-            console.log('Payment failed:', ResultDesc);
-        }
+    console.log('Payhero callback received:', JSON.stringify(req.body, null, 2));
+
+    // Process callback for your business logic.
+    // Example payload fields may include: paymentId, status, amount, phoneNumber.
+    const { paymentId, status, amount, phoneNumber } = req.body;
+    if (status === 'COMPLETED') {
+        console.log('Payment completed:', { paymentId, amount, phoneNumber });
+    } else {
+        console.log('Payment callback status:', status, { paymentId, amount, phoneNumber });
     }
-    
-    // Always respond to Safaricom to acknowledge receipt
-    res.json({ ResultCode: 0, ResultDesc: 'Success' });
+
+    res.json({ success: true });
 });
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
 });

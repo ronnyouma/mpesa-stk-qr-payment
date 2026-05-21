@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: mpesa-stk-qr-payment
+    name: payhero-qr-payment
     env: node
     region: oregon
     branch: main
@@ -8,15 +8,13 @@ services:
     buildCommand: npm install
     startCommand: npm start
     envVars:
-      - key: DARAJA_CONSUMER_KEY
+      - key: PAYHERO_API_USERNAME
         sync: false
-      - key: DARAJA_CONSUMER_SECRET
+      - key: PAYHERO_API_PASSWORD
         sync: false
-      - key: DARAJA_PASSKEY
+      - key: PAYHERO_MERCHANT_ID
         sync: false
-      - key: DARAJA_TILL_NUMBER
+      - key: PAYHERO_CALLBACK_URL
         sync: false
-      - key: DARAJA_SHORTCODE
-        sync: false
-      - key: DARAJA_CALLBACK_URL
+      - key: PAYHERO_BASE_URL
         sync: false

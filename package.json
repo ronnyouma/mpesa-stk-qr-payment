@@ -1,5 +1,5 @@
 {
-  "name": "mpesa-stk-qr",
+  "name": "payhero-qr-payment",
   "version": "1.0.0",
   "scripts": {
     "start": "node server.js"
