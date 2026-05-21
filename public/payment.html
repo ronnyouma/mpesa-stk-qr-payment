@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Pay with Payhero</title>
+    <title>Support Heaven Partakers</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body {
@@ -9,34 +9,53 @@
             max-width: 400px;
             margin: 50px auto;
             padding: 20px;
-            background: #f5f5f5;
+            background: #050505;
+            color: #111111;
         }
         .payment-card {
-            background: white;
+            background: #ffffff;
             padding: 30px;
             border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border: 2px solid #ff8a00;
+            box-shadow: 0 18px 45px rgba(255, 138, 0, 0.18);
         }
         h2 {
-            color: #0070f3;
+            color: #111111;
             text-align: center;
+            margin-top: 0;
+        }
+        label {
+            color: #111111;
+            font-weight: bold;
+        }
+        small {
+            color: #555555;
         }
         input, button {
             width: 100%;
             padding: 12px;
             margin: 10px 0;
-            border: 1px solid #ddd;
+            border: 1px solid #dddddd;
             border-radius: 5px;
             font-size: 16px;
+            box-sizing: border-box;
+        }
+        input:focus {
+            outline: none;
+            border-color: #ff8a00;
+            box-shadow: 0 0 0 3px rgba(255, 138, 0, 0.18);
         }
         button {
-            background: #0070f3;
-            color: white;
+            background: #ff8a00;
+            color: #111111;
             border: none;
             cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s ease, transform 0.2s ease;
         }
         button:hover {
-            background: #005bcc;
+            background: #ff9f24;
+            transform: translateY(-1px);
         }
         #status {
             margin-top: 20px;
@@ -45,20 +64,20 @@
             display: none;
         }
         .success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
+            background: #fff5e8;
+            color: #3a2200;
+            border: 1px solid #ffb866;
         }
         .error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
+            background: #111111;
+            color: #ffffff;
+            border: 1px solid #ff8a00;
         }
     </style>
 </head>
 <body>
     <div class="payment-card">
-        <h2>💳 Pay with Payhero</h2>
+        <h2>Support Heaven Partakers</h2>
         <p style="text-align: center; color: #333;">Enter your amount and phone number, then confirm the STK push on your phone.</p>
 
         <label>Enter Amount (KES):</label>
@@ -175,3 +194,4 @@
     </script>
 </body>
 </html>
+
