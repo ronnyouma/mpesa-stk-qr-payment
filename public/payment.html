@@ -65,8 +65,8 @@
         <input type="number" id="amount" placeholder="e.g., 500" min="1">
 
         <label>Your Phone Number:</label>
-        <input type="tel" id="phone" placeholder="254712345678">
-        <small>Format: 254712345678 (no leading zero or +)</small>
+        <input type="tel" id="phone" placeholder="0712345678">
+        <small>Format: 0712345678 or 254712345678</small>
 
         <button onclick="makePayment()">Pay Now</button>
         <div id="status"></div>
@@ -75,7 +75,7 @@
     <script>
         async function makePayment() {
             const amount = document.getElementById('amount').value;
-            const phone = document.getElementById('phone').value;
+            const phone = normalizePhoneInput(document.getElementById('phone').value);
             const statusDiv = document.getElementById('status');
 
             if (!amount || !phone) {
@@ -83,8 +83,8 @@
                 return;
             }
 
-            if (phone.length !== 12 || !phone.startsWith('254')) {
-                showStatus('Phone must be 254XXXXXXXXX format', 'error');
+            if (!phone) {
+                showStatus('Phone must be 07XXXXXXXX, 01XXXXXXXX, 2547XXXXXXXX, or 2541XXXXXXXX format', 'error');
                 return;
             }
 
@@ -147,6 +147,20 @@
                 .replaceAll('>', '&gt;')
                 .replaceAll('"', '&quot;')
                 .replaceAll("'", '&#039;');
+        }
+
+        function normalizePhoneInput(value) {
+            const digits = String(value || '').replace(/\D/g, '');
+
+            if (/^254[17]\d{8}$/.test(digits)) {
+                return `0${digits.slice(3)}`;
+            }
+
+            if (/^0[17]\d{8}$/.test(digits)) {
+                return digits;
+            }
+
+            return '';
         }
     </script>
 </body>

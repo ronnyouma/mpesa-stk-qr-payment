@@ -12,7 +12,7 @@ const config = {
     username: process.env.PAYHERO_API_USERNAME || 'YOUR_PAYHERO_API_USERNAME',
     password: process.env.PAYHERO_API_PASSWORD || 'YOUR_PAYHERO_API_PASSWORD',
     channelId: process.env.PAYHERO_CHANNEL_ID || process.env.PAYHERO_MERCHANT_ID || 'YOUR_CHANNEL_ID',
-    provider: process.env.PAYHERO_PROVIDER || 'sasapay',
+    provider: process.env.PAYHERO_PROVIDER || 'm-pesa',
     networkCode: process.env.PAYHERO_NETWORK_CODE || '63902',
     callbackUrl: process.env.PAYHERO_CALLBACK_URL || 'https://your-public-url/api/callback',
     baseUrl: process.env.PAYHERO_BASE_URL || 'https://backend.payhero.co.ke/api/v2',
@@ -38,11 +38,33 @@ function getPaymentReferenceFromResponse(data) {
     return data.CheckoutRequestID || data.checkout_request_id || data.reference || data.data?.CheckoutRequestID || data.data?.reference || null;
 }
 
+function normalizePhoneForPayhero(phone) {
+    const digits = String(phone || '').replace(/\D/g, '');
+
+    if (/^254[17]\d{8}$/.test(digits)) {
+        return `0${digits.slice(3)}`;
+    }
+
+    if (/^0[17]\d{8}$/.test(digits)) {
+        return digits;
+    }
+
+    return null;
+}
+
 async function createPayheroPayment(amount, phone) {
     const externalReference = `INV-${Date.now()}`;
+    const payheroPhone = normalizePhoneForPayhero(phone);
+
+    if (!payheroPhone) {
+        const error = new Error('Phone must be 07XXXXXXXX, 01XXXXXXXX, 2547XXXXXXXX, or 2541XXXXXXXX format');
+        error.status = 400;
+        throw error;
+    }
+
     const basePayload = {
         amount,
-        phone_number: phone,
+        phone_number: payheroPhone,
         provider: config.provider,
         external_reference: externalReference,
         callback_url: config.callbackUrl
