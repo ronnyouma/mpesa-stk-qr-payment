@@ -22,6 +22,9 @@ if (config.username.startsWith('YOUR_') || config.password.startsWith('YOUR_') |
 }
 
 function getCheckoutUrlFromResponse(data) {
+    if (!data || typeof data !== 'object') {
+        return null;
+    }
     return data.checkoutUrl || data.paymentUrl || data.redirectUrl || data.url || data.data?.checkoutUrl || data.data?.paymentUrl;
 }
 

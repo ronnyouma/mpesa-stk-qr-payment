@@ -102,17 +102,28 @@
                     })
                 });
 
-                const data = await response.json();
+                let data = null;
+                try {
+                    data = await response.json();
+                } catch (jsonError) {
+                    console.error('Invalid JSON response from /api/payhero', jsonError);
+                }
 
-                if (data.success && data.checkoutUrl) {
+                if (!data || typeof data !== 'object') {
+                    showStatus('Failed: Invalid server response. Check console for details.', 'error');
+                    return;
+                }
+
+                if (response.ok && data.checkoutUrl) {
                     showStatus('Redirecting to Payhero checkout...', 'success');
                     window.location.href = data.checkoutUrl;
-                } else if (data.success) {
+                } else if (response.ok) {
                     showStatus('Payment request created. Please follow the checkout link.', 'success');
                 } else {
-                    showStatus('Failed: ' + data.message, 'error');
+                    showStatus('Failed: ' + (data.message || response.statusText), 'error');
                 }
             } catch (error) {
+                console.error('Fetch error:', error);
                 showStatus('Network error. Please try again.', 'error');
             }
         }
