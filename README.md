@@ -41,6 +41,8 @@ Set these environment variables before starting the app:
 
 If `PAYHERO_API_URL` is not provided, the app will try a set of common Payhero payment paths under `PAYHERO_BASE_URL`.
 
+If Payhero responds with HTTP 400, the app now logs the response body and tries common phone field names (`phoneNumber`, `msisdn`, `mobileNumber`, `phone`, `customerPhoneNumber`).
+
 Example in PowerShell:
 
 ```powershell

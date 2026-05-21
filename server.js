@@ -26,17 +26,24 @@ function getCheckoutUrlFromResponse(data) {
 }
 
 async function createPayheroPayment(amount, phone) {
-    const payload = {
+    const basePayload = {
         merchantId: config.merchantId,
         amount,
         currency: 'KES',
-        phoneNumber: phone,
         callbackUrl: config.callbackUrl,
         description: 'Payhero payment for goods',
         metadata: {
             source: 'Payhero QR Checkout'
         }
     };
+
+    const payloadVariants = [
+        { phoneNumber: phone },
+        { msisdn: phone },
+        { mobileNumber: phone },
+        { phone: phone },
+        { customerPhoneNumber: phone }
+    ].map(extra => ({ ...basePayload, ...extra }));
 
     const auth = Buffer.from(`${config.username}:${config.password}`).toString('base64');
 
@@ -45,25 +52,62 @@ async function createPayheroPayment(amount, phone) {
         'Content-Type': 'application/json'
     };
 
-    async function tryPost(url) {
+    async function tryPost(url, payload) {
         try {
-            console.log('Trying Payhero URL:', url);
+            console.log('Trying Payhero URL:', url, 'payloadKeys:', Object.keys(payload).join(', '));
             const response = await axios.post(url, payload, { headers });
-            return response.data;
+            return { success: true, data: response.data };
         } catch (error) {
-            if (error.response?.status === 404) {
+            const status = error.response?.status;
+            const responseData = error.response?.data;
+            if (status === 404) {
                 console.warn('Payhero URL not found:', url);
-                return null;
+                return { success: false, notFound: true };
             }
-            throw error;
+
+            console.warn('Payhero request failed:', {
+                url,
+                status,
+                payloadKeys: Object.keys(payload),
+                responseData
+            });
+
+            return {
+                success: false,
+                error: Object.assign(new Error(`Payhero request failed ${status || ''}`.trim()), {
+                    status,
+                    responseData,
+                    url,
+                    payload
+                })
+            };
         }
     }
 
+    async function tryUrl(url) {
+        let lastError = null;
+        for (const payload of payloadVariants) {
+            const result = await tryPost(url, payload);
+            if (result.success) {
+                return result.data;
+            }
+            if (result.notFound) {
+                return null;
+            }
+            lastError = result.error;
+        }
+        throw lastError;
+    }
+
+    let lastError = null;
     if (config.apiUrl) {
         const apiUrl = config.apiUrl.replace(/\/+$/, '');
-        const data = await tryPost(apiUrl);
-        if (data) return data;
-        throw new Error(`Payhero API URL returned 404: ${apiUrl}`);
+        try {
+            return await tryUrl(apiUrl);
+        } catch (error) {
+            lastError = error;
+            throw lastError;
+        }
     }
 
     const candidatePaths = [
@@ -83,11 +127,14 @@ async function createPayheroPayment(amount, phone) {
     const base = config.baseUrl.replace(/\/+$/, '');
     for (const path of candidatePaths) {
         const apiUrl = base + path;
-        const data = await tryPost(apiUrl);
-        if (data) return data;
+        try {
+            return await tryUrl(apiUrl);
+        } catch (error) {
+            lastError = error;
+        }
     }
 
-    throw new Error(`Unable to find a valid Payhero endpoint. Tried ${candidatePaths.length} candidate paths based on base URL ${base}`);
+    throw lastError || new Error(`Unable to find a valid Payhero endpoint. Tried ${candidatePaths.length} candidate paths based on base URL ${base}`);
 }
 
 app.get('/', (req, res) => {
@@ -150,10 +197,18 @@ app.post('/api/payhero', async (req, res) => {
             paymentData: data
         });
     } catch (error) {
-        console.error('Payhero payment error:', error.response?.data || error.message);
-        res.status(500).json({
+        console.error('Payhero payment error:', {
+            message: error.message,
+            status: error.status,
+            responseData: error.responseData,
+            url: error.url
+        });
+
+        const status = Number.isInteger(error.status) ? error.status : 500;
+        res.status(status).json({
             success: false,
-            message: error.response?.data?.message || error.message || 'Payment initiation failed'
+            message: error.responseData?.message || error.message || 'Payment initiation failed',
+            details: error.responseData || { url: error.url }
         });
     }
 });
